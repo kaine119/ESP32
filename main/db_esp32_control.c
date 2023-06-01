@@ -57,7 +57,6 @@ int8_t num_connected_tcp_clients = 0;
 int8_t num_connected_udp_clients = 0;
 
 int open_serial_socket() {
-    int serial_socket;
     uart_config_t uart_config = {
             .baud_rate = DB_UART_BAUD_RATE,
             .data_bits = UART_DATA_8_BITS,
@@ -68,13 +67,14 @@ int open_serial_socket() {
     ESP_ERROR_CHECK(uart_param_config(UART_NUM, &uart_config));
     ESP_ERROR_CHECK(uart_set_pin(UART_NUM, DB_UART_PIN_TX, DB_UART_PIN_RX, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE));
     ESP_ERROR_CHECK(uart_driver_install(UART_NUM, 1024, 0, 0, NULL, 0));
-    if ((serial_socket = open("/dev/uart/1", O_RDWR)) == -1) {
-        ESP_LOGE(TAG, "Cannot open UART1");
-        close(serial_socket);
-        uart_driver_delete(UART_NUM);
-        return ESP_FAIL;
-    }
-    esp_vfs_dev_uart_use_driver(UART_NUM);
+    // if ((serial_socket = open("/dev/uart/1", O_RDWR)) == -1) {
+    //     ESP_LOGE(TAG, "Cannot open UART1");
+    //     close(serial_socket);
+    //     uart_driver_delete(UART_NUM);
+    //     return ESP_FAIL;
+    // }
+    // esp_vfs_dev_uart_use_driver(UART_NUM);
+    return 1;
 }
 
 int open_udp_socket() {
