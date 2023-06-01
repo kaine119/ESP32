@@ -48,13 +48,13 @@ char DEFAULT_AP_IP[32] = "192.168.2.1";
 uint8_t DEFAULT_CHANNEL = 6;
 uint8_t SERIAL_PROTOCOL = 4;  // 1=MSP, 4=MAVLink/transparent
 # ifdef USE_ALT_UART_CONFIG
-uint8_t DB_UART_PIN_TX = GPIO_NUM_33;
-uint8_t DB_UART_PIN_RX = GPIO_NUM_32;
+uint8_t DB_UART_PIN_TX = GPIO_NUM_21;
+uint8_t DB_UART_PIN_RX = GPIO_NUM_20;
 # else
-uint8_t DB_UART_PIN_TX = GPIO_NUM_17;
-uint8_t DB_UART_PIN_RX = GPIO_NUM_16;
+uint8_t DB_UART_PIN_TX = GPIO_NUM_5;
+uint8_t DB_UART_PIN_RX = GPIO_NUM_4;
 #endif
-int DB_UART_BAUD_RATE = 115200;
+int DB_UART_BAUD_RATE = 921600;
 uint16_t TRANSPARENT_BUF_SIZE = 64;
 uint8_t LTM_FRAME_NUM_BUFFER = 1;
 uint8_t MSP_LTM_SAMEPORT = 0;
@@ -161,14 +161,13 @@ void init_wifi(void) {
                     .max_connection = 10
             },
     };
-    xthal_memcpy(wifi_config.ap.ssid, DEFAULT_SSID, 32);
-    xthal_memcpy(wifi_config.ap.password, DEFAULT_PWD, 64);
+    memcpy(wifi_config.ap.ssid, DEFAULT_SSID, 32);
+    memcpy(wifi_config.ap.password, DEFAULT_PWD, 64);
 
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_AP));
     ESP_ERROR_CHECK(esp_wifi_set_protocol(WIFI_IF_AP, WIFI_PROTOCOL_11B));
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_AP, &wifi_config));
-    wifi_country_t wifi_country = {.cc = "XX", .schan = 1, .nchan = 13, .policy = WIFI_COUNTRY_POLICY_MANUAL};
-    ESP_ERROR_CHECK(esp_wifi_set_country(&wifi_country));
+    ESP_ERROR_CHECK(esp_wifi_set_country_code("01", true));
     ESP_ERROR_CHECK(esp_wifi_start());
 
     esp_netif_ip_info_t ip;

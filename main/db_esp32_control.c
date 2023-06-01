@@ -68,14 +68,13 @@ int open_serial_socket() {
     ESP_ERROR_CHECK(uart_param_config(UART_NUM, &uart_config));
     ESP_ERROR_CHECK(uart_set_pin(UART_NUM, DB_UART_PIN_TX, DB_UART_PIN_RX, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE));
     ESP_ERROR_CHECK(uart_driver_install(UART_NUM, 1024, 0, 0, NULL, 0));
-    if ((serial_socket = open("/dev/uart/2", O_RDWR)) == -1) {
-        ESP_LOGE(TAG, "Cannot open UART2");
+    if ((serial_socket = open("/dev/uart/1", O_RDWR)) == -1) {
+        ESP_LOGE(TAG, "Cannot open UART1");
         close(serial_socket);
         uart_driver_delete(UART_NUM);
         return ESP_FAIL;
     }
-    esp_vfs_dev_uart_use_driver(2);
-    return serial_socket;
+    esp_vfs_dev_uart_use_driver(UART_NUM);
 }
 
 int open_udp_socket() {
