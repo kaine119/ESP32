@@ -61,16 +61,35 @@ uint8_t MSP_LTM_SAMEPORT = 0;
 
 static void wifi_event_handler(void *arg, esp_event_base_t event_base,
                                int32_t event_id, void *event_data) {
-    if (event_id == WIFI_EVENT_AP_STACONNECTED) {
-        wifi_event_ap_staconnected_t *event = (wifi_event_ap_staconnected_t *) event_data;
-        ESP_LOGI(TAG, "Client connected - station:"MACSTR", AID=%d", MAC2STR(event->mac), event->aid);
-    } else if (event_id == WIFI_EVENT_AP_STADISCONNECTED) {
-        wifi_event_ap_stadisconnected_t *event = (wifi_event_ap_stadisconnected_t *) event_data;
-        ESP_LOGI(TAG, "Client disconnected - station:"MACSTR", AID=%d", MAC2STR(event->mac), event->aid);
-    } else if (event_id == WIFI_EVENT_AP_START) {
+    switch (event_id) {
+    // AP mode handlers
+    case WIFI_EVENT_AP_STACONNECTED:
+        {
+            wifi_event_ap_staconnected_t *event = (wifi_event_ap_staconnected_t *) event_data;
+            ESP_LOGI(TAG, "Client connected - station:"MACSTR", AID=%d", MAC2STR(event->mac), event->aid);
+            break;  
+        }
+    case WIFI_EVENT_AP_STADISCONNECTED:
+        {    
+            wifi_event_ap_stadisconnected_t *event = (wifi_event_ap_stadisconnected_t *) event_data;
+            ESP_LOGI(TAG, "Client disconnected - station:"MACSTR", AID=%d", MAC2STR(event->mac), event->aid);
+            break;
+        }    
+    case WIFI_EVENT_AP_START:
         ESP_LOGI(TAG, "AP started!");
-    } else if (event_id == WIFI_EVENT_AP_STOP) {
+        break;
+    case WIFI_EVENT_AP_STOP:
         ESP_LOGI(TAG, "AP stopped!");
+        break;
+
+    // STA mode handlers
+    case WIFI_EVENT_STA_START:
+        ESP_LOGI(TAG, "STA started, attempting to connect");
+        ESP_ERROR_CHECK(esp_wifi_connect());
+        break;
+    case WIFI_EVENT_STA_CONNECTED:
+        ESP_LOGI(TAG, "STA connected");
+        break;
     }
 }
 
@@ -139,45 +158,73 @@ esp_err_t init_fs(void) {
 void init_wifi(void) {
     ESP_ERROR_CHECK(esp_netif_init());
     ESP_ERROR_CHECK(esp_event_loop_create_default());
-    esp_netif_t *esp_net = esp_netif_create_default_wifi_ap();
 
+    // Initialize wifi    
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
     ESP_ERROR_CHECK(esp_wifi_init(&cfg));
 
+    // Register WiFi event handler
     ESP_ERROR_CHECK(esp_event_handler_instance_register(WIFI_EVENT,
                                                         ESP_EVENT_ANY_ID,
                                                         &wifi_event_handler,
                                                         NULL,
                                                         NULL));
+    esp_netif_t *esp_net;
 
-    wifi_config_t wifi_config = {
-            .ap = {
-                    .ssid = "DroneBridge_ESP32_Init",
-                    .ssid_len = 0,
-                    .authmode = WIFI_AUTH_WPA_PSK,
-                    .channel = DEFAULT_CHANNEL,
-                    .ssid_hidden = 0,
-                    .beacon_interval = 100,
-                    .max_connection = 10
-            },
-    };
-    memcpy(wifi_config.ap.ssid, DEFAULT_SSID, 32);
-    memcpy(wifi_config.ap.password, DEFAULT_PWD, 64);
+    if (false) {
+        // Configure AP
+        esp_net = esp_netif_create_default_wifi_ap();
+        wifi_config_t wifi_config = {
+                .ap = {
+                        .ssid = "DroneBridge_ESP32_Init",
+                        .ssid_len = 0,
+                        .authmode = WIFI_AUTH_WPA_PSK,
+                        .channel = DEFAULT_CHANNEL,
+                        .ssid_hidden = 0,
+                        .beacon_interval = 100,
+                        .max_connection = 10
+                },
+        };
+        memcpy(wifi_config.ap.ssid, DEFAULT_SSID, 32);
+        memcpy(wifi_config.ap.password, DEFAULT_PWD, 64);
 
-    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_AP));
-    ESP_ERROR_CHECK(esp_wifi_set_protocol(WIFI_IF_AP, WIFI_PROTOCOL_11B));
-    ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_AP, &wifi_config));
-    ESP_ERROR_CHECK(esp_wifi_set_country_code("01", true));
-    ESP_ERROR_CHECK(esp_wifi_start());
+        ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_AP));
+        ESP_ERROR_CHECK(esp_wifi_set_protocol(WIFI_IF_AP, WIFI_PROTOCOL_11B));
+        ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_AP, &wifi_config));
+        ESP_ERROR_CHECK(esp_wifi_set_country_code("01", true));
+        ESP_ERROR_CHECK(esp_wifi_start());
 
-    esp_netif_ip_info_t ip;
-    memset(&ip, 0, sizeof(esp_netif_ip_info_t));
-    ip.ip.addr = ipaddr_addr(DEFAULT_AP_IP);
-    ip.netmask.addr = ipaddr_addr("255.255.255.0");
-    ip.gw.addr = ipaddr_addr(DEFAULT_AP_IP);
-    ESP_ERROR_CHECK(esp_netif_dhcps_stop(esp_net));
-    ESP_ERROR_CHECK(esp_netif_set_ip_info(esp_net, &ip));
-    ESP_ERROR_CHECK(esp_netif_dhcps_start(esp_net));
+        // Setup DHCP server for AP mode
+        esp_netif_ip_info_t ip;
+        memset(&ip, 0, sizeof(esp_netif_ip_info_t));
+        ip.ip.addr = ipaddr_addr(DEFAULT_AP_IP);
+        ip.netmask.addr = ipaddr_addr("255.255.255.0");
+        ip.gw.addr = ipaddr_addr(DEFAULT_AP_IP);
+        ESP_ERROR_CHECK(esp_netif_dhcps_stop(esp_net));
+        ESP_ERROR_CHECK(esp_netif_set_ip_info(esp_net, &ip));
+        ESP_ERROR_CHECK(esp_netif_dhcps_start(esp_net));
+    } else {
+        esp_net = esp_netif_create_default_wifi_sta();
+        // Configure STA
+        wifi_config_t wifi_config = {
+                .sta = {
+                        .ssid = "",
+                        .password = "",
+                },
+        };
+
+        esp_netif_ip_info_t ip_info;
+        memset(&ip_info, 0, sizeof(esp_netif_ip_info_t));
+        ip_info.ip.addr = ipaddr_addr("192.168.1.120");
+        ip_info.netmask.addr = ipaddr_addr("255.255.255.0");
+        ip_info.gw.addr = ipaddr_addr("192.168.1.120");
+        ESP_ERROR_CHECK(esp_netif_dhcpc_stop(esp_net));
+        ESP_ERROR_CHECK(esp_netif_set_ip_info(esp_net, &ip_info));
+
+        ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
+        ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config));
+        ESP_ERROR_CHECK(esp_wifi_start());
+    }
 
     ESP_ERROR_CHECK(esp_netif_set_hostname(esp_net, "DBESP32"));
 }
