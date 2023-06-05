@@ -34,6 +34,7 @@
 #include "db_protocol.h"
 #include "esp_vfs_semihost.h"
 #include "esp_spiffs.h"
+#include "globals.h"
 #include "http_server.h"
 #include "main.h"
 
@@ -42,8 +43,11 @@
 
 static const char *TAG = "DB_ESP32";
 
-uint8_t DEFAULT_SSID[32] = "DroneBridge ESP32";
-uint8_t DEFAULT_PWD[64] = "dronebridge";
+uint8_t DB_WIFI_MODE = 0; // 0 = AP mode, 1 = STA mode
+uint8_t AP_MODE_SSID[32] = "DroneBridge ESP32";
+uint8_t AP_MODE_PWD[64] = "dronebridge";
+uint8_t STA_MODE_SSID[32] = "";
+uint8_t STA_MODE_PWD[64] = "";
 char DEFAULT_AP_IP[32] = "192.168.2.1";
 uint8_t DEFAULT_CHANNEL = 6;
 uint8_t SERIAL_PROTOCOL = 4;  // 1=MSP, 4=MAVLink/transparent
@@ -84,7 +88,7 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base,
 
     // STA mode handlers
     case WIFI_EVENT_STA_START:
-        ESP_LOGI(TAG, "STA started, attempting to connect");
+        ESP_LOGI(TAG, "STA started, attempting to connect to %s:%s", STA_MODE_SSID, STA_MODE_PWD);
         ESP_ERROR_CHECK(esp_wifi_connect());
         break;
     case WIFI_EVENT_STA_CONNECTED:
@@ -171,7 +175,7 @@ void init_wifi(void) {
                                                         NULL));
     esp_netif_t *esp_net;
 
-    if (false) {
+    if (DB_WIFI_MODE == 0) {
         // Configure AP
         esp_net = esp_netif_create_default_wifi_ap();
         wifi_config_t wifi_config = {
@@ -185,8 +189,8 @@ void init_wifi(void) {
                         .max_connection = 10
                 },
         };
-        memcpy(wifi_config.ap.ssid, DEFAULT_SSID, 32);
-        memcpy(wifi_config.ap.password, DEFAULT_PWD, 64);
+        memcpy(wifi_config.ap.ssid, AP_MODE_SSID, 32);
+        memcpy(wifi_config.ap.password, AP_MODE_PWD, 64);
 
         ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_AP));
         ESP_ERROR_CHECK(esp_wifi_set_protocol(WIFI_IF_AP, WIFI_PROTOCOL_11B));
@@ -212,7 +216,8 @@ void init_wifi(void) {
                         .password = "",
                 },
         };
-
+        memcpy(wifi_config.sta.ssid, STA_MODE_SSID, 32);
+        memcpy(wifi_config.sta.password, STA_MODE_PWD, 64);
         esp_netif_ip_info_t ip_info;
         memset(&ip_info, 0, sizeof(esp_netif_ip_info_t));
         ip_info.ip.addr = ipaddr_addr("192.168.1.120");
@@ -233,13 +238,15 @@ void write_settings_to_nvs() {
     ESP_LOGI(TAG,
              "Trying to save: ssid %s\nwifi_pass %s\nwifi_chan %i\nbaud %i\ngpio_tx %i\ngpio_rx %i\nproto %i\n"
              "trans_pack_size %i\nltm_per_packet %i\nmsp_ltm %i\nap_ip %s",
-             DEFAULT_SSID, DEFAULT_PWD, DEFAULT_CHANNEL, DB_UART_BAUD_RATE, DB_UART_PIN_TX, DB_UART_PIN_RX,
+             AP_MODE_SSID, AP_MODE_PWD, DEFAULT_CHANNEL, DB_UART_BAUD_RATE, DB_UART_PIN_TX, DB_UART_PIN_RX,
              SERIAL_PROTOCOL, TRANSPARENT_BUF_SIZE, LTM_FRAME_NUM_BUFFER, MSP_LTM_SAMEPORT, DEFAULT_AP_IP);
     ESP_LOGI(TAG, "Saving to NVS %s", NVS_NAMESPACE);
     nvs_handle my_handle;
     ESP_ERROR_CHECK(nvs_open(NVS_NAMESPACE, NVS_READWRITE, &my_handle));
-    ESP_ERROR_CHECK(nvs_set_str(my_handle, "ssid", (char *) DEFAULT_SSID));
-    ESP_ERROR_CHECK(nvs_set_str(my_handle, "wifi_pass", (char *) DEFAULT_PWD));
+    ESP_ERROR_CHECK(nvs_set_str(my_handle, "ap_ssid", (char *) AP_MODE_SSID));
+    ESP_ERROR_CHECK(nvs_set_str(my_handle, "ap_pass", (char *) AP_MODE_PWD));
+    ESP_ERROR_CHECK(nvs_set_str(my_handle, "sta_ssid", (char *) STA_MODE_SSID));
+    ESP_ERROR_CHECK(nvs_set_str(my_handle, "sta_pass", (char *) STA_MODE_PWD));
     ESP_ERROR_CHECK(nvs_set_u8(my_handle, "wifi_chan", DEFAULT_CHANNEL));
     ESP_ERROR_CHECK(nvs_set_i32(my_handle, "baud", DB_UART_BAUD_RATE));
     ESP_ERROR_CHECK(nvs_set_u8(my_handle, "gpio_tx", DB_UART_PIN_TX));
@@ -249,6 +256,7 @@ void write_settings_to_nvs() {
     ESP_ERROR_CHECK(nvs_set_u8(my_handle, "ltm_per_packet", LTM_FRAME_NUM_BUFFER));
     ESP_ERROR_CHECK(nvs_set_u8(my_handle, "msp_ltm", MSP_LTM_SAMEPORT));
     ESP_ERROR_CHECK(nvs_set_str(my_handle, "ap_ip", DEFAULT_AP_IP));
+    ESP_ERROR_CHECK(nvs_set_u8(my_handle, "wifi_mode", DB_WIFI_MODE));
     ESP_ERROR_CHECK(nvs_commit(my_handle));
     nvs_close(my_handle);
 }
@@ -265,15 +273,25 @@ void read_settings_nvs() {
     } else {
         ESP_LOGI(TAG, "Reading settings from NVS");
         size_t required_size = 0;
-        ESP_ERROR_CHECK(nvs_get_str(my_handle, "ssid", NULL, &required_size));
-        char *ssid = malloc(required_size);
-        ESP_ERROR_CHECK(nvs_get_str(my_handle, "ssid", ssid, &required_size));
-        memcpy(DEFAULT_SSID, ssid, required_size);
+        ESP_ERROR_CHECK(nvs_get_str(my_handle, "ap_ssid", NULL, &required_size));
+        char *ap_ssid = malloc(required_size);
+        ESP_ERROR_CHECK(nvs_get_str(my_handle, "ap_ssid", ap_ssid, &required_size));
+        memcpy(AP_MODE_SSID, ap_ssid, required_size);
 
-        ESP_ERROR_CHECK(nvs_get_str(my_handle, "wifi_pass", NULL, &required_size));
-        char *wifi_pass = malloc(required_size);
-        ESP_ERROR_CHECK(nvs_get_str(my_handle, "wifi_pass", wifi_pass, &required_size));
-        memcpy(DEFAULT_PWD, wifi_pass, required_size);
+        ESP_ERROR_CHECK(nvs_get_str(my_handle, "ap_pass", NULL, &required_size));
+        char *ap_pass = malloc(required_size);
+        ESP_ERROR_CHECK(nvs_get_str(my_handle, "ap_pass", ap_pass, &required_size));
+        memcpy(AP_MODE_PWD, ap_pass, required_size);
+
+        ESP_ERROR_CHECK(nvs_get_str(my_handle, "sta_ssid", NULL, &required_size));
+        char *sta_ssid = malloc(required_size);
+        ESP_ERROR_CHECK(nvs_get_str(my_handle, "sta_ssid", sta_ssid, &required_size));
+        memcpy(STA_MODE_SSID, sta_ssid, required_size);
+
+        ESP_ERROR_CHECK(nvs_get_str(my_handle, "sta_pass", NULL, &required_size));
+        char *sta_pass = malloc(required_size);
+        ESP_ERROR_CHECK(nvs_get_str(my_handle, "sta_pass", sta_pass, &required_size));
+        memcpy(STA_MODE_PWD, sta_pass, required_size);
 
         ESP_ERROR_CHECK(nvs_get_str(my_handle, "ap_ip", NULL, &required_size));
         char *ap_ip = malloc(required_size);
@@ -288,9 +306,12 @@ void read_settings_nvs() {
         ESP_ERROR_CHECK(nvs_get_u16(my_handle, "trans_pack_size", &TRANSPARENT_BUF_SIZE));
         ESP_ERROR_CHECK(nvs_get_u8(my_handle, "ltm_per_packet", &LTM_FRAME_NUM_BUFFER));
         ESP_ERROR_CHECK(nvs_get_u8(my_handle, "msp_ltm", &MSP_LTM_SAMEPORT));
+        ESP_ERROR_CHECK(nvs_get_u8(my_handle, "wifi_mode", &DB_WIFI_MODE));
         nvs_close(my_handle);
-        free(wifi_pass);
-        free(ssid);
+        free(ap_ssid);
+        free(ap_pass);
+        free(sta_ssid);
+        free(sta_pass);
         free(ap_ip);
     }
 }

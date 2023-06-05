@@ -147,18 +147,24 @@ static esp_err_t settings_change_post_handler(httpd_req_t *req) {
     buf[total_len] = '\0';
 
     cJSON *root = cJSON_Parse(buf);
-    cJSON *json = cJSON_GetObjectItem(root, "wifi_ssid");
+
+    cJSON *json = cJSON_GetObjectItem(root, "wifi_mode");
+    if (json && (json->valueint == 0 || json->valueint == 1)) 
+        DB_WIFI_MODE = json->valueint;
+    else if (json)
+        ESP_LOGE(REST_TAG, "Only option 0 or 1 are allowed for wifi_port parameter! Not changing!");
+
+    json = cJSON_GetObjectItem(root, "ap_ssid");
     if (json && strlen(json->valuestring) < 32 && strlen(json->valuestring) > 0)
-        strncpy((char *) DEFAULT_SSID, json->valuestring, sizeof(DEFAULT_SSID) - 1);
-    else if (json)
-        ESP_LOGE(REST_TAG, "Invalid SSID length (1-31)");
+        strncpy((char *) AP_MODE_SSID, json->valuestring, sizeof(AP_MODE_SSID) - 1);
+    else if (json && DB_WIFI_MODE == 0)
+        ESP_LOGE(REST_TAG, "Invalid AP SSID length (1-31)");
 
-    json = cJSON_GetObjectItem(root, "wifi_pass");
+    json = cJSON_GetObjectItem(root, "ap_pass");
     if (json && strlen(json->valuestring) < 64 && strlen(json->valuestring) > 7)
-        strncpy((char *) DEFAULT_PWD, json->valuestring, sizeof(DEFAULT_PWD) - 1);
-    else if (json)
-        ESP_LOGE(REST_TAG, "Invalid password length (8-63)");
-
+        strncpy((char *) AP_MODE_PWD, json->valuestring, sizeof(AP_MODE_PWD) - 1);
+    else if (json && DB_WIFI_MODE == 0)
+        ESP_LOGE(REST_TAG, "Invalid AP password length (8-63)");
 
     json = cJSON_GetObjectItem(root, "ap_channel");
     if (json && json->valueint > 0 && json->valueint < 14) {
@@ -166,6 +172,25 @@ static esp_err_t settings_change_post_handler(httpd_req_t *req) {
     } else if (json) {
         ESP_LOGE(REST_TAG, "No a valid wifi channel (1-13). Not changing!");
     }
+
+    json = cJSON_GetObjectItem(root, "ap_ip");
+    if (json && is_valid_ip4(json->valuestring)) {
+        strncpy(DEFAULT_AP_IP, json->valuestring, sizeof(DEFAULT_AP_IP) - 1);
+    } else if (json) {
+        ESP_LOGE(REST_TAG, "New IP \"%s\" is not a valid IP address! Not changing!", json->valuestring);
+    }
+
+    json = cJSON_GetObjectItem(root, "sta_ssid");
+    if (json && strlen(json->valuestring) < 32 && strlen(json->valuestring) > 0)
+        strncpy((char *) STA_MODE_SSID, json->valuestring, sizeof(STA_MODE_SSID) - 1);
+    else if (json && DB_WIFI_MODE == 1)
+        ESP_LOGE(REST_TAG, "Invalid STA SSID length (1-31)");
+
+    json = cJSON_GetObjectItem(root, "sta_pass");
+    if (json && strlen(json->valuestring) < 64 && strlen(json->valuestring) > 7)
+        strncpy((char *) STA_MODE_PWD, json->valuestring, sizeof(STA_MODE_PWD) - 1);
+    else if (json && DB_WIFI_MODE == 1)
+        ESP_LOGE(REST_TAG, "Invalid STA password length (8-63)");
 
     json = cJSON_GetObjectItem(root, "trans_pack_size");
     if (json) TRANSPARENT_BUF_SIZE = json->valueint;
@@ -193,12 +218,6 @@ static esp_err_t settings_change_post_handler(httpd_req_t *req) {
     else if (json)
         ESP_LOGE(REST_TAG, "Only option 0 or 1 are allowed for msp_ltm_port parameter! Not changing!");
 
-    json = cJSON_GetObjectItem(root, "ap_ip");
-    if (json && is_valid_ip4(json->valuestring)) {
-        strncpy(DEFAULT_AP_IP, json->valuestring, sizeof(DEFAULT_AP_IP) - 1);
-    } else if (json) {
-        ESP_LOGE(REST_TAG, "New IP \"%s\" is not a valid IP address! Not changing!", json->valuestring);
-    }
     write_settings_to_nvs();
     ESP_LOGI(REST_TAG, "Settings changed!");
     cJSON_Delete(root);
@@ -252,13 +271,17 @@ static esp_err_t system_reboot_get_handler(httpd_req_t *req) {
     return ESP_OK;
 }
 
-/* Simple handler for getting temperature data */
+/* Handler for getting settings data */
 static esp_err_t settings_data_get_handler(httpd_req_t *req) {
     httpd_resp_set_type(req, "application/json");
     cJSON *root = cJSON_CreateObject();
-    cJSON_AddStringToObject(root, "wifi_ssid", (char *) DEFAULT_SSID);
-    cJSON_AddStringToObject(root, "wifi_pass", (char *) DEFAULT_PWD);
+    cJSON_AddNumberToObject(root, "wifi_mode", DB_WIFI_MODE);
+    cJSON_AddStringToObject(root, "ap_ssid", (char *) AP_MODE_SSID);
+    cJSON_AddStringToObject(root, "ap_pass", (char *) AP_MODE_PWD);
+    cJSON_AddStringToObject(root, "sta_ssid", (char *) STA_MODE_SSID);
+    cJSON_AddStringToObject(root, "sta_pass", (char *) STA_MODE_PWD);
     cJSON_AddNumberToObject(root, "ap_channel", DEFAULT_CHANNEL);
+    cJSON_AddStringToObject(root, "ap_ip", DEFAULT_AP_IP);
     cJSON_AddNumberToObject(root, "trans_pack_size", TRANSPARENT_BUF_SIZE);
     cJSON_AddNumberToObject(root, "tx_pin", DB_UART_PIN_TX);
     cJSON_AddNumberToObject(root, "rx_pin", DB_UART_PIN_RX);
@@ -266,7 +289,6 @@ static esp_err_t settings_data_get_handler(httpd_req_t *req) {
     cJSON_AddNumberToObject(root, "telem_proto", SERIAL_PROTOCOL);
     cJSON_AddNumberToObject(root, "ltm_pp", LTM_FRAME_NUM_BUFFER);
     cJSON_AddNumberToObject(root, "msp_ltm_port", MSP_LTM_SAMEPORT);
-    cJSON_AddStringToObject(root, "ap_ip", DEFAULT_AP_IP);
     const char *sys_info = cJSON_Print(root);
     httpd_resp_sendstr(req, sys_info);
     free((void *) sys_info);
@@ -315,13 +337,13 @@ esp_err_t start_rest_server(const char *base_path) {
     httpd_register_uri_handler(server, &system_reboot_get_uri);
 
     /* URI handler for fetching settings data */
-    httpd_uri_t temperature_data_get_uri = {
+    httpd_uri_t settings_data_get_uri = {
             .uri = "/api/settings/request",
             .method = HTTP_GET,
             .handler = settings_data_get_handler,
             .user_ctx = rest_context
     };
-    httpd_register_uri_handler(server, &temperature_data_get_uri);
+    httpd_register_uri_handler(server, &settings_data_get_uri);
 
     /* URI handler for light brightness control */
     httpd_uri_t settings_change_post_uri = {
