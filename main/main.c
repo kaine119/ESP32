@@ -62,6 +62,7 @@ int DB_UART_BAUD_RATE = 921600;
 uint16_t TRANSPARENT_BUF_SIZE = 64;
 uint8_t LTM_FRAME_NUM_BUFFER = 1;
 uint8_t MSP_LTM_SAMEPORT = 0;
+uint8_t CONNECTED_FLAG = 0;
 
 static void wifi_event_handler(void *arg, esp_event_base_t event_base,
                                int32_t event_id, void *event_data) {
@@ -93,6 +94,7 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base,
         break;
     case WIFI_EVENT_STA_CONNECTED:
         ESP_LOGI(TAG, "STA connected");
+        CONNECTED_FLAG = 1;
         break;
     }
 }
@@ -158,6 +160,22 @@ esp_err_t init_fs(void) {
 }
 
 #endif
+
+// If we haven't connected to a network in 90 seconds,
+// there's probably something wrong with our config.
+// Reboot into AP mode to allow reconfiguration.
+void sta_timeout(TimerHandle_t xTimer) {
+    // vTaskDelay(10 * 1000 / portTICK_RATE_MS);
+    ESP_LOGI(TAG, "STA timeout reached");
+    if (CONNECTED_FLAG == 0) {
+        ESP_LOGI(TAG, "STA could not connect, rebooting to AP...");
+        DB_WIFI_MODE = 0;
+        write_settings_to_nvs();
+        esp_restart();
+    } else {
+        ESP_LOGI(TAG, "STA connected, no action taken");
+    }
+}
 
 void init_wifi(void) {
     ESP_ERROR_CHECK(esp_netif_init());
@@ -229,6 +247,10 @@ void init_wifi(void) {
         ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
         ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config));
         ESP_ERROR_CHECK(esp_wifi_start());
+
+        // Station mode timeout
+        TimerHandle_t timer = xTimerCreate("reboot_into_ap", pdMS_TO_TICKS(90 * 1000), pdFALSE, 0, &sta_timeout);
+        xTimerStart(timer, 0);
     }
 
     ESP_ERROR_CHECK(esp_netif_set_hostname(esp_net, "DBESP32"));
