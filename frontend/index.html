@@ -241,6 +241,26 @@
             <button class="button-primary" onclick="trigger_reboot()">Reboot ESP32</button>
         </div>
     </div>
+    <div class="row">
+        <h1>CPU Stats</h1>
+        <table>
+            <thead>
+                <tr>
+                    <td>Task name</td>
+                    <td>Runtime (ticks?)</td>
+                    <td>% usage</td>
+                </tr>
+            </thead>
+            <tbody id="cpu-stats">
+                <tr>
+                    <td>IDLE</td>
+                    <td>12489745</td>
+                    <td>98%</td>
+                </tr>
+            </tbody>
+        </table>
+        <pre id="cpu-stats"></pre>
+    </div>
 </div>
 <div class="container">
     <div id="about" style="margin-top: 1rem" class="row">DroneBridge for ESP32 - waiting for response from the ESP32

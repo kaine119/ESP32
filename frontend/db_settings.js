@@ -104,10 +104,42 @@ function get_stats() {
         } else if (!isNaN(udp_clients)) {
             document.getElementById("udp_connected").innerHTML = udp_clients + " client"
         }
+
+        let cpu_stats = parse_cpu_stats(json_data["cpu"].trim());
+        document.getElementById("cpu-stats").innerHTML = "";
+        for (let row of cpu_stats) {
+            let taskNameData = document.createElement("td");
+            taskNameData.append(row.taskName);
+            let runtimeData = document.createElement("td");
+            runtimeData.append(row.runtime);
+            let percentData = document.createElement("td");
+            percentData.append(row.percent);
+            
+            let rowElement = document.createElement("tr");
+            rowElement.append(taskNameData);
+            rowElement.append(runtimeData);
+            rowElement.append(percentData);
+            document.getElementById("cpu-stats").append(rowElement);
+        }
+        update_conn_status();
     }).catch(error => {
         conn_status = 0
         error.message;
     });
+}
+
+function parse_cpu_stats(msg) {
+    let result = []
+    let rows = msg.split("\n");
+    for (let row of rows) {
+        row = row.split("|");
+        result.push({
+            taskName: row[0],
+            runtime: row[1],
+            percent: row[2]
+        });
+    }
+    return result;
 }
 
 function get_settings() {

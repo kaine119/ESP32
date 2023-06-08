@@ -28,6 +28,7 @@
 #include "cJSON.h"
 #include "globals.h"
 #include "main.h"
+#include "real_time_stats.h"
 
 static const char *REST_TAG = "DB_HTTP_REST";
 #define REST_CHECK(a, str, goto_tag, ...)                                              \
@@ -247,11 +248,14 @@ static esp_err_t system_info_get_handler(httpd_req_t *req) {
 
 /* Simple handler for getting system handler */
 static esp_err_t system_stats_get_handler(httpd_req_t *req) {
+    char pcWriteBuffer[1000] = {0};
+    print_real_time_stats(10, pcWriteBuffer);
     httpd_resp_set_type(req, "application/json");
     cJSON *root = cJSON_CreateObject();
     cJSON_AddNumberToObject(root, "read_bytes", uart_byte_count);
     cJSON_AddNumberToObject(root, "tcp_connected", num_connected_tcp_clients);
     cJSON_AddNumberToObject(root, "udp_connected", num_connected_udp_clients);
+    cJSON_AddStringToObject(root, "cpu", pcWriteBuffer);
     const char *sys_info = cJSON_Print(root);
     httpd_resp_sendstr(req, sys_info);
     free((void *) sys_info);
