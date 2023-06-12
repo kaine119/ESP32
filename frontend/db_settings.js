@@ -10,7 +10,14 @@ function toJSONString(form) {
         let name = element.name
         let value = element.value;
         let parsed = parseInt(value)
-        if (!isNaN(parsed) && name.localeCompare("ap_ip")) {
+        if (name == "ap_ssid" || name == "ap_pass"
+            || name == "sta_ssid" || name == "sta_pass"
+            || name == "ap_ip_addr" || name == "sta_ip_addr"
+            || name == "sta_ip_mask" || name == "sta_ip_gateway") {
+            // Browser will cast an all-digit input to numbers. However, these fields need to be
+            // strings, even if the string is all digits. 
+            obj[name] = value.toString();
+        } else if (!isNaN(parsed)) {
             if (name) {
                 obj[name] = parsed
             }
