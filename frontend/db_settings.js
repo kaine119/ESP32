@@ -159,6 +159,8 @@ function get_settings() {
                 elem.value = json_data[key] + ""
             }
         }
+        onWifiModeChange();
+        onDHCPSelect();
     }).catch(error => {
         conn_status = 0
         error.message;
@@ -198,4 +200,22 @@ function trigger_reboot() {
     }).catch(error => {
         error.message;
     });
+}
+
+function onDHCPSelect() {
+    if (document.getElementById("sta_dhcp_mode").value == 0) {
+        document.getElementById("static-ip-options").style.display = "block";
+    } else {
+        document.getElementById("static-ip-options").style.display = "none";
+    }
+}
+
+function onWifiModeChange() {
+    if (document.getElementById("wifi_mode").value == 0) {
+        document.getElementById("ap-mode-options").style.display = "block";
+        document.getElementById("sta-mode-options").style.display = "none";
+    } else {
+        document.getElementById("ap-mode-options").style.display = "none";
+        document.getElementById("sta-mode-options").style.display = "block";
+    }
 }
