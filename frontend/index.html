@@ -127,37 +127,62 @@
                     </select>
                 </div>
             </div>
-            <h2>AP mode settings</h2>
-            <div class="row">
-                <div class="six columns">
-                    <label for="ap_ssid">AP SSID</label>
-                    <input type="text" name="ap_ssid" value="" id="ap_ssid">
+            <div id="ap-mode-settings">
+                <h2>AP mode settings</h2>
+                <div class="row">
+                    <div class="six columns">
+                        <label for="ap_ssid">AP SSID</label>
+                        <input type="text" name="ap_ssid" value="" id="ap_ssid">
+                    </div>
+                    <div class="six columns">
+                        <label for="ap_pass">AP Password</label>
+                        <input type="text" name="ap_pass" value="" id="ap_pass">
+                    </div>
                 </div>
-                <div class="six columns">
-                    <label for="ap_pass">AP Password</label>
-                    <input type="text" name="ap_pass" value="" id="ap_pass">
-                </div>
-            </div>
-            <div class="row">
-                <div class="six columns">
-                    <label for="ap_channel">Wifi Channel</label>
-                    <input type="text" name="ap_channel" value="" id="ap_channel">
-                </div>
-                <div class="six columns">
-                    <label for="ap_ip">Gateway IP address</label>
-                    <input type="text" name="ap_ip" value="" id="ap_ip">
+                <div class="row">
+                    <div class="six columns">
+                        <label for="ap_channel">Wifi Channel</label>
+                        <input type="text" name="ap_channel" value="" id="ap_channel">
+                    </div>
+                    <div class="six columns">
+                        <label for="ap_ip">Gateway IP address</label>
+                        <input type="text" name="ap_ip" value="" id="ap_ip">
+                    </div>
                 </div>
             </div>
 
-            <h2>Station mode settings</h2>
-            <div class="row">
-                <div class="six columns">
-                    <label for="sta_ssid">Host SSID</label>
-                    <input type="text" name="sta_ssid" value="" id="sta_ssid">
+            <div id="sta-mode-settings">
+                <h2>Station mode settings</h2>
+                <div class="row">
+                    <div class="six columns">
+                        <label for="sta_ssid">Host SSID</label>
+                        <input type="text" name="sta_ssid" value="" id="sta_ssid">
+                    </div>
+                    <div class="six columns">
+                        <label for="sta_pass">Host Password</label>
+                        <input type="text" name="sta_pass" value="" id="sta_pass">
+                    </div>
                 </div>
-                <div class="six columns">
-                    <label for="sta_pass">Host Password</label>
-                    <input type="text" name="sta_pass" value="" id="sta_pass">
+                <div class="row">
+                    <label for="sta_dhcp_mode">IP mode</label>
+                    <select id="sta_dhcp_mode" name="sta_dhcp_mode" form="settings_form" onchange="onDHCPSelect()">
+                        <option value="0">Static</option>
+                        <option value="1">DHCP</option>
+                    </select>
+                </div>
+                <div class="row" id="static-ip-options">
+                    <div class="four columns">
+                        <label for="sta_ssid">IP address</label>
+                        <input type="text" name="sta_ip_addr" value="" id="sta_ip_addr">
+                    </div>
+                    <div class="four columns">
+                        <label for="sta_ip_mask">IP mask</label>
+                        <input type="text" name="sta_ip_mask" value="" id="sta_ip_mask">
+                    </div>
+                    <div class="four columns">
+                        <label for="sta_ip_gateway">Gateway IP</label>
+                        <input type="text" name="sta_ip_gateway" value="" id="sta_ip_gateway">
+                    </div>
                 </div>
             </div>
         </div>

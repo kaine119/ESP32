@@ -31,9 +31,13 @@
 extern uint8_t DB_WIFI_MODE;            // 0 = AP mode, 1 = STA mode
 extern uint8_t AP_MODE_SSID[32];
 extern uint8_t AP_MODE_PWD[64];
+extern char AP_IP_ADDR[32];
 extern uint8_t STA_MODE_SSID[32];
 extern uint8_t STA_MODE_PWD[64];
-extern char DEFAULT_AP_IP[32];
+extern char STA_IP_ADDR[32];
+extern char STA_IP_MASK[32];
+extern char STA_IP_GATEWAY[32];
+extern uint8_t STA_DHCP_MODE;           // 0 = Use static IP, 1 = Use DHCP
 extern uint8_t DEFAULT_CHANNEL;
 extern uint8_t SERIAL_PROTOCOL;         // 1=MSP, 3=MAVLink/transparent
 extern uint8_t DB_UART_PIN_TX;

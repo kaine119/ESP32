@@ -149,11 +149,15 @@ static esp_err_t settings_change_post_handler(httpd_req_t *req) {
 
     cJSON *root = cJSON_Parse(buf);
 
+    ESP_LOGI(REST_TAG, "Parsed JSON buffer");
+
     cJSON *json = cJSON_GetObjectItem(root, "wifi_mode");
     if (json && (json->valueint == 0 || json->valueint == 1)) 
         DB_WIFI_MODE = json->valueint;
     else if (json)
         ESP_LOGE(REST_TAG, "Only option 0 or 1 are allowed for wifi_port parameter! Not changing!");
+
+    ESP_LOGI(REST_TAG, "Read wifi_mode");
 
     json = cJSON_GetObjectItem(root, "ap_ssid");
     if (json && strlen(json->valuestring) < 32 && strlen(json->valuestring) > 0)
@@ -161,11 +165,15 @@ static esp_err_t settings_change_post_handler(httpd_req_t *req) {
     else if (json && DB_WIFI_MODE == 0)
         ESP_LOGE(REST_TAG, "Invalid AP SSID length (1-31)");
 
+    ESP_LOGI(REST_TAG, "Read ap_ssid");
+
     json = cJSON_GetObjectItem(root, "ap_pass");
     if (json && strlen(json->valuestring) < 64 && strlen(json->valuestring) > 7)
         strncpy((char *) AP_MODE_PWD, json->valuestring, sizeof(AP_MODE_PWD) - 1);
     else if (json && DB_WIFI_MODE == 0)
         ESP_LOGE(REST_TAG, "Invalid AP password length (8-63)");
+
+    ESP_LOGI(REST_TAG, "Read ap_pass");
 
     json = cJSON_GetObjectItem(root, "ap_channel");
     if (json && json->valueint > 0 && json->valueint < 14) {
@@ -174,12 +182,16 @@ static esp_err_t settings_change_post_handler(httpd_req_t *req) {
         ESP_LOGE(REST_TAG, "No a valid wifi channel (1-13). Not changing!");
     }
 
-    json = cJSON_GetObjectItem(root, "ap_ip");
+    ESP_LOGI(REST_TAG, "Read ap_channel");
+
+    json = cJSON_GetObjectItem(root, "ap_ip_addr");
     if (json && is_valid_ip4(json->valuestring)) {
-        strncpy(DEFAULT_AP_IP, json->valuestring, sizeof(DEFAULT_AP_IP) - 1);
+        strncpy(AP_IP_ADDR, json->valuestring, sizeof(AP_IP_ADDR) - 1);
     } else if (json) {
-        ESP_LOGE(REST_TAG, "New IP \"%s\" is not a valid IP address! Not changing!", json->valuestring);
+        ESP_LOGE(REST_TAG, "New IP \"%s\" is not a valid AP IP address! Not changing!", json->valuestring);
     }
+
+    ESP_LOGI(REST_TAG, "Read ap_ip_addr");
 
     json = cJSON_GetObjectItem(root, "sta_ssid");
     if (json && strlen(json->valuestring) < 32 && strlen(json->valuestring) > 0)
@@ -187,20 +199,70 @@ static esp_err_t settings_change_post_handler(httpd_req_t *req) {
     else if (json && DB_WIFI_MODE == 1)
         ESP_LOGE(REST_TAG, "Invalid STA SSID length (1-31)");
 
+    ESP_LOGI(REST_TAG, "Read sta_ssid");
+
     json = cJSON_GetObjectItem(root, "sta_pass");
     if (json && strlen(json->valuestring) < 64 && strlen(json->valuestring) > 7)
         strncpy((char *) STA_MODE_PWD, json->valuestring, sizeof(STA_MODE_PWD) - 1);
     else if (json && DB_WIFI_MODE == 1)
         ESP_LOGE(REST_TAG, "Invalid STA password length (8-63)");
 
+    ESP_LOGI(REST_TAG, "Read sta_pass");
+
+    json = cJSON_GetObjectItem(root, "sta_dhcp_mode");
+    if (json && (json->valueint == 0 || json->valueint == 1)) 
+        STA_DHCP_MODE = json->valueint;
+    else if (json)
+        ESP_LOGE(REST_TAG, "Only option 0 or 1 are allowed for sta_dhcp_mode parameter! Not changing!");
+
+    ESP_LOGI(REST_TAG, "Read sta_dhcp_mode");
+
+    json = cJSON_GetObjectItem(root, "sta_ip_addr");
+    if (json && is_valid_ip4(json->valuestring)) {
+        strncpy(STA_IP_ADDR, json->valuestring, sizeof(STA_IP_ADDR) - 1);
+    } else if (json) {
+        ESP_LOGE(REST_TAG, "New IP \"%s\" is not a valid STA IP address! Not changing!", json->valuestring);
+    }
+
+    ESP_LOGI(REST_TAG, "Read ap_ip_addr");
+
+    json = cJSON_GetObjectItem(root, "sta_ip_mask");
+    if (json && is_valid_ip4(json->valuestring)) {
+        strncpy(STA_IP_MASK, json->valuestring, sizeof(STA_IP_MASK) - 1);
+    } else if (json) {
+        ESP_LOGE(REST_TAG, "New IP \"%s\" is not a valid STA IP mask! Not changing!", json->valuestring);
+    }
+
+    ESP_LOGI(REST_TAG, "Read ap_ip_addr");
+
+    json = cJSON_GetObjectItem(root, "sta_ip_gateway");
+    if (json && is_valid_ip4(json->valuestring)) {
+        strncpy(STA_IP_GATEWAY, json->valuestring, sizeof(STA_IP_GATEWAY) - 1);
+    } else if (json) {
+        ESP_LOGE(REST_TAG, "New IP \"%s\" is not a valid STA IP gateway! Not changing!", json->valuestring);
+    }
+
+    ESP_LOGI(REST_TAG, "Read ap_ip_addr");    
+
     json = cJSON_GetObjectItem(root, "trans_pack_size");
     if (json) TRANSPARENT_BUF_SIZE = json->valueint;
+
+    ESP_LOGI(REST_TAG, "Read trans_pack_size");
+
     json = cJSON_GetObjectItem(root, "tx_pin");
     if (json) DB_UART_PIN_TX = json->valueint;
+
+    ESP_LOGI(REST_TAG, "Read tx_pin");
+
     json = cJSON_GetObjectItem(root, "rx_pin");
     if (json) DB_UART_PIN_RX = json->valueint;
+
+    ESP_LOGI(REST_TAG, "Read rx_pin");
+
     json = cJSON_GetObjectItem(root, "baud");
     if (json) DB_UART_BAUD_RATE = json->valueint;
+
+    ESP_LOGI(REST_TAG, "Read baud");
 
     json = cJSON_GetObjectItem(root, "telem_proto");
     if (json && (json->valueint == 1 || json->valueint == 4)) {
@@ -210,14 +272,20 @@ static esp_err_t settings_change_post_handler(httpd_req_t *req) {
         SERIAL_PROTOCOL = 4;
     }
 
+    ESP_LOGI(REST_TAG, "Read telem_proto");
+
     json = cJSON_GetObjectItem(root, "ltm_pp");
     if (json) LTM_FRAME_NUM_BUFFER = json->valueint;
+
+    ESP_LOGI(REST_TAG, "Read ltm_pp");
 
     json = cJSON_GetObjectItem(root, "msp_ltm_port");
     if (json && (json->valueint == 0 || json->valueint == 1))
         MSP_LTM_SAMEPORT = json->valueint;
     else if (json)
         ESP_LOGE(REST_TAG, "Only option 0 or 1 are allowed for msp_ltm_port parameter! Not changing!");
+
+    ESP_LOGI(REST_TAG, "Read msp_ltm_port");
 
     write_settings_to_nvs();
     ESP_LOGI(REST_TAG, "Settings changed!");
@@ -282,10 +350,14 @@ static esp_err_t settings_data_get_handler(httpd_req_t *req) {
     cJSON_AddNumberToObject(root, "wifi_mode", DB_WIFI_MODE);
     cJSON_AddStringToObject(root, "ap_ssid", (char *) AP_MODE_SSID);
     cJSON_AddStringToObject(root, "ap_pass", (char *) AP_MODE_PWD);
+    cJSON_AddStringToObject(root, "ap_ip", AP_IP_ADDR);
+    cJSON_AddNumberToObject(root, "ap_channel", DEFAULT_CHANNEL);
     cJSON_AddStringToObject(root, "sta_ssid", (char *) STA_MODE_SSID);
     cJSON_AddStringToObject(root, "sta_pass", (char *) STA_MODE_PWD);
-    cJSON_AddNumberToObject(root, "ap_channel", DEFAULT_CHANNEL);
-    cJSON_AddStringToObject(root, "ap_ip", DEFAULT_AP_IP);
+    cJSON_AddNumberToObject(root, "sta_dhcp_mode", STA_DHCP_MODE);
+    cJSON_AddStringToObject(root, "sta_ip_addr", STA_IP_ADDR);
+    cJSON_AddStringToObject(root, "sta_ip_mask", STA_IP_MASK);
+    cJSON_AddStringToObject(root, "sta_ip_gateway", STA_IP_GATEWAY);
     cJSON_AddNumberToObject(root, "trans_pack_size", TRANSPARENT_BUF_SIZE);
     cJSON_AddNumberToObject(root, "tx_pin", DB_UART_PIN_TX);
     cJSON_AddNumberToObject(root, "rx_pin", DB_UART_PIN_RX);

@@ -46,9 +46,13 @@ static const char *TAG = "DB_ESP32";
 uint8_t DB_WIFI_MODE = 0; // 0 = AP mode, 1 = STA mode
 uint8_t AP_MODE_SSID[32] = "DroneBridge ESP32";
 uint8_t AP_MODE_PWD[64] = "dronebridge";
+char AP_IP_ADDR[32] = "192.168.2.1";
 uint8_t STA_MODE_SSID[32] = "";
 uint8_t STA_MODE_PWD[64] = "";
-char DEFAULT_AP_IP[32] = "192.168.2.1";
+uint8_t STA_DHCP_MODE = 0; // 0 = Use static IP, 1 = Use DHCP
+char STA_IP_ADDR[32] = "192.168.1.120";
+char STA_IP_MASK[32] = "255.255.255.0";
+char STA_IP_GATEWAY[32] = "192.168.1.1";
 uint8_t DEFAULT_CHANNEL = 6;
 uint8_t SERIAL_PROTOCOL = 4;  // 1=MSP, 4=MAVLink/transparent
 # ifdef USE_ALT_UART_CONFIG
@@ -219,9 +223,9 @@ void init_wifi(void) {
         // Setup DHCP server for AP mode
         esp_netif_ip_info_t ip;
         memset(&ip, 0, sizeof(esp_netif_ip_info_t));
-        ip.ip.addr = ipaddr_addr(DEFAULT_AP_IP);
+        ip.ip.addr = ipaddr_addr(AP_IP_ADDR);
         ip.netmask.addr = ipaddr_addr("255.255.255.0");
-        ip.gw.addr = ipaddr_addr(DEFAULT_AP_IP);
+        ip.gw.addr = ipaddr_addr(AP_IP_ADDR);
         ESP_ERROR_CHECK(esp_netif_dhcps_stop(esp_net));
         ESP_ERROR_CHECK(esp_netif_set_ip_info(esp_net, &ip));
         ESP_ERROR_CHECK(esp_netif_dhcps_start(esp_net));
@@ -238,11 +242,17 @@ void init_wifi(void) {
         memcpy(wifi_config.sta.password, STA_MODE_PWD, 64);
         esp_netif_ip_info_t ip_info;
         memset(&ip_info, 0, sizeof(esp_netif_ip_info_t));
-        ip_info.ip.addr = ipaddr_addr("192.168.1.120");
-        ip_info.netmask.addr = ipaddr_addr("255.255.255.0");
-        ip_info.gw.addr = ipaddr_addr("192.168.1.120");
-        ESP_ERROR_CHECK(esp_netif_dhcpc_stop(esp_net));
-        ESP_ERROR_CHECK(esp_netif_set_ip_info(esp_net, &ip_info));
+        
+        if (STA_DHCP_MODE == 0) {
+            ESP_LOGI(TAG, "Attempting to connect with IP %s, mask %s, gateway %s", STA_IP_ADDR, STA_IP_MASK, STA_IP_GATEWAY);
+            ip_info.ip.addr = ipaddr_addr(STA_IP_ADDR);
+            ip_info.netmask.addr = ipaddr_addr(STA_IP_MASK);
+            ip_info.gw.addr = ipaddr_addr(STA_IP_GATEWAY);
+            ESP_ERROR_CHECK(esp_netif_dhcpc_stop(esp_net));
+            ESP_ERROR_CHECK(esp_netif_set_ip_info(esp_net, &ip_info));
+        } else {
+            ESP_ERROR_CHECK(esp_netif_dhcpc_start(esp_net));
+        }
 
         ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
         ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config));
@@ -261,14 +271,19 @@ void write_settings_to_nvs() {
              "Trying to save: ssid %s\nwifi_pass %s\nwifi_chan %i\nbaud %i\ngpio_tx %i\ngpio_rx %i\nproto %i\n"
              "trans_pack_size %i\nltm_per_packet %i\nmsp_ltm %i\nap_ip %s",
              AP_MODE_SSID, AP_MODE_PWD, DEFAULT_CHANNEL, DB_UART_BAUD_RATE, DB_UART_PIN_TX, DB_UART_PIN_RX,
-             SERIAL_PROTOCOL, TRANSPARENT_BUF_SIZE, LTM_FRAME_NUM_BUFFER, MSP_LTM_SAMEPORT, DEFAULT_AP_IP);
+             SERIAL_PROTOCOL, TRANSPARENT_BUF_SIZE, LTM_FRAME_NUM_BUFFER, MSP_LTM_SAMEPORT, AP_IP_ADDR);
     ESP_LOGI(TAG, "Saving to NVS %s", NVS_NAMESPACE);
     nvs_handle my_handle;
     ESP_ERROR_CHECK(nvs_open(NVS_NAMESPACE, NVS_READWRITE, &my_handle));
     ESP_ERROR_CHECK(nvs_set_str(my_handle, "ap_ssid", (char *) AP_MODE_SSID));
     ESP_ERROR_CHECK(nvs_set_str(my_handle, "ap_pass", (char *) AP_MODE_PWD));
+    ESP_ERROR_CHECK(nvs_set_str(my_handle, "ap_ip_addr", AP_IP_ADDR));
     ESP_ERROR_CHECK(nvs_set_str(my_handle, "sta_ssid", (char *) STA_MODE_SSID));
     ESP_ERROR_CHECK(nvs_set_str(my_handle, "sta_pass", (char *) STA_MODE_PWD));
+    ESP_ERROR_CHECK(nvs_set_str(my_handle, "sta_ip_addr", STA_IP_ADDR));
+    ESP_ERROR_CHECK(nvs_set_str(my_handle, "sta_ip_mask", STA_IP_MASK));
+    ESP_ERROR_CHECK(nvs_set_str(my_handle, "sta_ip_gateway", STA_IP_GATEWAY));
+    ESP_ERROR_CHECK(nvs_set_u8(my_handle, "sta_dhcp_mode", STA_DHCP_MODE));
     ESP_ERROR_CHECK(nvs_set_u8(my_handle, "wifi_chan", DEFAULT_CHANNEL));
     ESP_ERROR_CHECK(nvs_set_i32(my_handle, "baud", DB_UART_BAUD_RATE));
     ESP_ERROR_CHECK(nvs_set_u8(my_handle, "gpio_tx", DB_UART_PIN_TX));
@@ -277,7 +292,6 @@ void write_settings_to_nvs() {
     ESP_ERROR_CHECK(nvs_set_u16(my_handle, "trans_pack_size", TRANSPARENT_BUF_SIZE));
     ESP_ERROR_CHECK(nvs_set_u8(my_handle, "ltm_per_packet", LTM_FRAME_NUM_BUFFER));
     ESP_ERROR_CHECK(nvs_set_u8(my_handle, "msp_ltm", MSP_LTM_SAMEPORT));
-    ESP_ERROR_CHECK(nvs_set_str(my_handle, "ap_ip", DEFAULT_AP_IP));
     ESP_ERROR_CHECK(nvs_set_u8(my_handle, "wifi_mode", DB_WIFI_MODE));
     ESP_ERROR_CHECK(nvs_commit(my_handle));
     nvs_close(my_handle);
@@ -305,6 +319,11 @@ void read_settings_nvs() {
         ESP_ERROR_CHECK(nvs_get_str(my_handle, "ap_pass", ap_pass, &required_size));
         memcpy(AP_MODE_PWD, ap_pass, required_size);
 
+        ESP_ERROR_CHECK(nvs_get_str(my_handle, "ap_ip_addr", NULL, &required_size));
+        char *ap_ip_addr = malloc(required_size);
+        ESP_ERROR_CHECK(nvs_get_str(my_handle, "ap_ip_addr", ap_ip_addr, &required_size));
+        memcpy(AP_IP_ADDR, ap_ip_addr, required_size);
+
         ESP_ERROR_CHECK(nvs_get_str(my_handle, "sta_ssid", NULL, &required_size));
         char *sta_ssid = malloc(required_size);
         ESP_ERROR_CHECK(nvs_get_str(my_handle, "sta_ssid", sta_ssid, &required_size));
@@ -315,11 +334,22 @@ void read_settings_nvs() {
         ESP_ERROR_CHECK(nvs_get_str(my_handle, "sta_pass", sta_pass, &required_size));
         memcpy(STA_MODE_PWD, sta_pass, required_size);
 
-        ESP_ERROR_CHECK(nvs_get_str(my_handle, "ap_ip", NULL, &required_size));
-        char *ap_ip = malloc(required_size);
-        ESP_ERROR_CHECK(nvs_get_str(my_handle, "ap_ip", ap_ip, &required_size));
-        memcpy(DEFAULT_AP_IP, ap_ip, required_size);
+        ESP_ERROR_CHECK(nvs_get_str(my_handle, "sta_ip_addr", NULL, &required_size));
+        char *sta_ip_addr = malloc(required_size);
+        ESP_ERROR_CHECK(nvs_get_str(my_handle, "sta_ip_addr", sta_ip_addr, &required_size));
+        memcpy(STA_IP_ADDR, sta_ip_addr, required_size);
 
+        ESP_ERROR_CHECK(nvs_get_str(my_handle, "sta_ip_mask", NULL, &required_size));
+        char *sta_ip_mask = malloc(required_size);
+        ESP_ERROR_CHECK(nvs_get_str(my_handle, "sta_ip_mask", sta_ip_mask, &required_size));
+        memcpy(STA_IP_MASK, sta_ip_mask, required_size);
+
+        ESP_ERROR_CHECK(nvs_get_str(my_handle, "sta_ip_gateway", NULL, &required_size));
+        char *sta_ip_gateway = malloc(required_size);
+        ESP_ERROR_CHECK(nvs_get_str(my_handle, "sta_ip_gateway", sta_ip_gateway, &required_size));
+        memcpy(STA_IP_GATEWAY, sta_ip_gateway, required_size);
+
+        ESP_ERROR_CHECK(nvs_get_u8(my_handle, "sta_dhcp_mode", &STA_DHCP_MODE));
         ESP_ERROR_CHECK(nvs_get_u8(my_handle, "wifi_chan", &DEFAULT_CHANNEL));
         ESP_ERROR_CHECK(nvs_get_i32(my_handle, "baud", &DB_UART_BAUD_RATE));
         ESP_ERROR_CHECK(nvs_get_u8(my_handle, "gpio_tx", &DB_UART_PIN_TX));
@@ -332,9 +362,12 @@ void read_settings_nvs() {
         nvs_close(my_handle);
         free(ap_ssid);
         free(ap_pass);
+        free(ap_ip_addr);
         free(sta_ssid);
         free(sta_pass);
-        free(ap_ip);
+        free(sta_ip_addr);
+        free(sta_ip_mask);
+        free(sta_ip_gateway);
     }
 }
 
