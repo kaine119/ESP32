@@ -287,6 +287,14 @@ static esp_err_t settings_change_post_handler(httpd_req_t *req) {
 
     ESP_LOGI(REST_TAG, "Read msp_ltm_port");
 
+    json = cJSON_GetObjectItem(root, "udp_port");
+    if (json && (json->valueint >= 0 && json->valueint <= 65535)) 
+        APP_PORT_PROXY_UDP = json->valueint;
+    else if (json)
+        ESP_LOGE(REST_TAG, "UDP port %s not between 0 and 65535", json->valueint);
+
+    ESP_LOGI(REST_TAG, "Read udp_port");
+
     write_settings_to_nvs();
     ESP_LOGI(REST_TAG, "Settings changed!");
     cJSON_Delete(root);
@@ -365,6 +373,7 @@ static esp_err_t settings_data_get_handler(httpd_req_t *req) {
     cJSON_AddNumberToObject(root, "telem_proto", SERIAL_PROTOCOL);
     cJSON_AddNumberToObject(root, "ltm_pp", LTM_FRAME_NUM_BUFFER);
     cJSON_AddNumberToObject(root, "msp_ltm_port", MSP_LTM_SAMEPORT);
+    cJSON_AddNumberToObject(root, "udp_port", APP_PORT_PROXY_UDP);
     const char *sys_info = cJSON_Print(root);
     httpd_resp_sendstr(req, sys_info);
     free((void *) sys_info);

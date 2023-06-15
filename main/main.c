@@ -67,6 +67,7 @@ uint16_t TRANSPARENT_BUF_SIZE = 64;
 uint8_t LTM_FRAME_NUM_BUFFER = 1;
 uint8_t MSP_LTM_SAMEPORT = 0;
 uint8_t CONNECTED_FLAG = 0;
+uint16_t APP_PORT_PROXY_UDP = 14555; // use this port for all MAVLink messages (UDP)
 
 static void wifi_event_handler(void *arg, esp_event_base_t event_base,
                                int32_t event_id, void *event_data) {
@@ -293,6 +294,7 @@ void write_settings_to_nvs() {
     ESP_ERROR_CHECK(nvs_set_u8(my_handle, "ltm_per_packet", LTM_FRAME_NUM_BUFFER));
     ESP_ERROR_CHECK(nvs_set_u8(my_handle, "msp_ltm", MSP_LTM_SAMEPORT));
     ESP_ERROR_CHECK(nvs_set_u8(my_handle, "wifi_mode", DB_WIFI_MODE));
+    ESP_ERROR_CHECK(nvs_set_u16(my_handle, "udp_port", APP_PORT_PROXY_UDP));
     ESP_ERROR_CHECK(nvs_commit(my_handle));
     nvs_close(my_handle);
 }
@@ -359,6 +361,7 @@ void read_settings_nvs() {
         ESP_ERROR_CHECK(nvs_get_u8(my_handle, "ltm_per_packet", &LTM_FRAME_NUM_BUFFER));
         ESP_ERROR_CHECK(nvs_get_u8(my_handle, "msp_ltm", &MSP_LTM_SAMEPORT));
         ESP_ERROR_CHECK(nvs_get_u8(my_handle, "wifi_mode", &DB_WIFI_MODE));
+        ESP_ERROR_CHECK(nvs_get_u16(my_handle, "udp_port", &APP_PORT_PROXY_UDP));
         nvs_close(my_handle);
         free(ap_ssid);
         free(ap_pass);
